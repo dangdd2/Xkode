@@ -1,0 +1,36 @@
+## .gitignore for OllamaCode
+
+# Build outputs
+bin/
+obj/
+nupkg/
+publish/
+
+# IDE
+.vs/
+.idea/
+*.user
+*.suo
+
+# .NET
+*.nupkg
+*.snupkg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.env
+.env.local
+appsettings.*.json
+!appsettings.json
+
+# Test results
+TestResults/
+coverage/
+*.trx
+
+# Logs
+logs/
+*.log
