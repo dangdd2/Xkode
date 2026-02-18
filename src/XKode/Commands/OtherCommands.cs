@@ -58,14 +58,18 @@ public class RunCommand(
             new() { Role = "system", Content = codeIndex.BuildSystemPrompt(ctx) },
             new() { Role = "user", Content = settings.Task }
         };
-
         var responseBuilder = new StringBuilder();
+        var renderer = new StreamingMarkdownRenderer();
+
+        AnsiConsole.MarkupLine("[grey]Thinking...[/]");
         await foreach (var chunk in ollama.ChatStreamAsync(messages))
         {
-            Console.Write(chunk);
+            renderer.ProcessChunk(chunk);
             responseBuilder.Append(chunk);
         }
-        Console.WriteLine("\n");
+
+        renderer.Complete();
+        Console.WriteLine();
 
         var response = responseBuilder.ToString();
 
@@ -165,10 +169,14 @@ public class ReviewCommand(
         AnsiConsole.Write(new Rule("[bold cyan]Code Review Results[/]").RuleStyle("cyan"));
         Console.WriteLine();
 
-        await foreach (var chunk in ollama.ChatStreamAsync(messages))
-            Console.Write(chunk);
+        var renderer = new StreamingMarkdownRenderer();
 
-        Console.WriteLine("\n");
+        AnsiConsole.MarkupLine("[grey]Thinking...[/]");
+        await foreach (var chunk in ollama.ChatStreamAsync(messages))
+            renderer.ProcessChunk(chunk);
+
+        renderer.Complete();
+        Console.WriteLine();
         return 0;
     }
 }
@@ -239,4 +247,88 @@ public class ModelsCommand(OllamaService ollama) : AsyncCommand
             => "💬 Multilingual / general",
         _ => "General purpose"
     };
+}
+
+internal sealed class StreamingMarkdownRenderer
+{
+    private bool _inCode;
+    private string _codeLang = "";
+    private readonly List<string> _codeLines = new();
+    private readonly StringBuilder _lineBuffer = new();
+
+    public void ProcessChunk(string chunk)
+    {
+        foreach (var ch in chunk)
+        {
+            if (ch == '\n')
+            {
+                ProcessLine(_lineBuffer.ToString());
+                _lineBuffer.Clear();
+            }
+            else if (ch != '\r')
+            {
+                _lineBuffer.Append(ch);
+            }
+        }
+    }
+
+    public void Complete()
+    {
+        if (_lineBuffer.Length > 0)
+        {
+            ProcessLine(_lineBuffer.ToString());
+            _lineBuffer.Clear();
+        }
+
+        if (_inCode && _codeLines.Count > 0)
+        {
+            RenderCodeBlock();
+            _inCode = false;
+            _codeLang = "";
+            _codeLines.Clear();
+        }
+    }
+
+    private void ProcessLine(string line)
+    {
+        if (line.TrimStart().StartsWith("```"))
+        {
+            if (!_inCode)
+            {
+                _inCode = true;
+                _codeLang = line.Trim().TrimStart('`');
+                _codeLines.Clear();
+            }
+            else
+            {
+                RenderCodeBlock();
+                _inCode = false;
+                _codeLang = "";
+                _codeLines.Clear();
+            }
+            return;
+        }
+
+        if (_inCode)
+        {
+            _codeLines.Add(line);
+        }
+        else
+        {
+            Console.WriteLine(line);
+        }
+    }
+
+    private void RenderCodeBlock()
+    {
+        var codeContent = string.Join('\n', _codeLines);
+        var headerText = CodeIndexService.FormatCodeHeader(_codeLang);
+
+        AnsiConsole.Write(
+            new Panel(Markup.Escape(codeContent))
+                .Header($"[bold cyan]{Markup.Escape(headerText)}[/]")
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey));
+        Console.WriteLine();
+    }
 }
