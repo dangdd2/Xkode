@@ -9,6 +9,45 @@ namespace XKode.Services;
 // ─────────────────────────────────────────────────────────────
 public class CodeIndexService(FileService files, ShellService shell)
 {
+    private static readonly Dictionary<string, string> CodeLangDisplayNames =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["js"]          = "JavaScript",
+            ["javascript"]  = "JavaScript",
+            ["ts"]          = "TypeScript",
+            ["typescript"]  = "TypeScript",
+            ["csharp"]      = "C#",
+            ["cs"]          = "C#",
+            ["c#"]          = "C#",
+            ["py"]          = "Python",
+            ["python"]      = "Python",
+            ["ps"]          = "PowerShell",
+            ["powershell"]  = "PowerShell",
+            ["sh"]          = "Bash",
+            ["bash"]        = "Bash",
+            ["shell"]       = "Shell",
+            ["cmd"]         = "Command Prompt",
+            ["json"]        = "JSON",
+            ["yaml"]        = "YAML",
+            ["yml"]         = "YAML",
+            ["toml"]        = "TOML",
+            ["sql"]         = "SQL",
+            ["html"]        = "HTML",
+            ["css"]         = "CSS",
+            ["xml"]         = "XML",
+            ["c"]           = "C",
+            ["cpp"]         = "C++",
+            ["c++"]         = "C++",
+            ["go"]          = "Go",
+            ["golang"]      = "Go",
+            ["rs"]          = "Rust",
+            ["rust"]        = "Rust",
+            ["php"]         = "PHP",
+            ["rb"]          = "Ruby",
+            ["ruby"]        = "Ruby",
+            ["java"]        = "Java",
+        };
+
     // ── Parse and execute any actions in AI response ────────
     public async Task<List<ActionResult>> ExecuteActionsAsync(
         string aiResponse,
@@ -54,6 +93,35 @@ public class CodeIndexService(FileService files, ShellService shell)
         }
 
         return results;
+    }
+
+    public static string FormatCodeHeader(string rawFenceInfo)
+    {
+        var info = rawFenceInfo.Trim();
+
+        if (info.StartsWith("```", StringComparison.Ordinal))
+            info = info.Trim('`').Trim();
+
+        if (string.IsNullOrWhiteSpace(info))
+            return "Code";
+
+        if (CodeLangDisplayNames.TryGetValue(info, out var mapped))
+            return $"Code — {mapped}";
+
+        // Handle common prefixes / multi-token forms like "language-csharp hljs"
+        var token = info;
+        var spaceIndex = token.IndexOfAny(new[] { ' ', '\t' });
+        if (spaceIndex > 0)
+            token = token[..spaceIndex];
+
+        if (token.StartsWith("language-", StringComparison.OrdinalIgnoreCase))
+            token = token["language-".Length..];
+
+        if (CodeLangDisplayNames.TryGetValue(token, out mapped))
+            return $"Code — {mapped}";
+
+        // Unknown language → generic header
+        return "Code";
     }
 
     // ── Build the system prompt with project context ────────
@@ -149,9 +217,10 @@ public class CodeIndexService(FileService files, ShellService shell)
                 {
                     // Render code block
                     var codeContent = string.Join('\n', codeLines);
+                    var headerText = FormatCodeHeader(codeLang);
                     AnsiConsole.Write(
                         new Panel(Markup.Escape(codeContent))
-                            .Header($"[bold cyan]{codeLang}[/]")
+                            .Header($"[bold cyan]{Markup.Escape(headerText)}[/]")
                             .Border(BoxBorder.Rounded)
                             .BorderColor(Color.Grey));
                     inCode = false;

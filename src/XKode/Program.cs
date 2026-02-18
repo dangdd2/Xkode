@@ -10,11 +10,20 @@ using Spectre.Console.Cli;
 //  Local AI Coding Agent powered by Ollama
 // ─────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────
+//  XKode CLI — Entry Point
+// ─────────────────────────────────────────────────────────────
+
+// Load global config
+var config = ConfigService.Load();
+
 var services = new ServiceCollection();
+services.AddSingleton(config); // Register config for DI
+
 services.AddHttpClient<OllamaService>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:11434");
-    client.Timeout = TimeSpan.FromMinutes(10);
+    client.BaseAddress = new Uri(config.OllamaUrl);
+    client.Timeout = TimeSpan.FromSeconds(config.OllamaTimeoutSeconds);
 });
 // OllamaService is already registered (Transient) by AddHttpClient above.
 // Do NOT re-register as Singleton — that would create a second instance
@@ -51,6 +60,12 @@ app.Configure(config =>
 
     config.AddCommand<ModelsCommand>("models")
           .WithDescription("List available Ollama models");
+
+    config.AddCommand<ConfigCommand>("config")
+          .WithDescription("View or initialize configuration")
+          .WithExample("config")
+          .WithExample("config", "init")
+          .WithExample("config", "env");
 
     // Show banner if no args
     if (args.Length == 0)

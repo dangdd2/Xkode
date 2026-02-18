@@ -9,30 +9,20 @@ namespace XKode.Services;
 // ─────────────────────────────────────────────────────────────
 //  OllamaService — Communicates with local Ollama HTTP API
 //
-//  Fix log:
-//  - OllamaUrl reads OLLAMA_HOST env var (default localhost:11434)
-//  - EnsureBaseAddress() guards against unconfigured HttpClient
-//  - IsAvailableAsync uses 3-second timeout — fails fast, no hang
-//  - ChatStreamAsync distinguishes timeout vs connection refused
-//  - PrintConnectionHelp() shows actionable fix steps in terminal
+//  Now uses ConfigService for URL and timeout settings.
 // ─────────────────────────────────────────────────────────────
-public class OllamaService(HttpClient http)
+public class OllamaService(HttpClient http, ConfigService config)
 {
-    private string _model = "qwen2.5-coder:7b";
-
-    // Reads OLLAMA_HOST env var, falls back to localhost:11434
-    public static string OllamaUrl =>
-        Environment.GetEnvironmentVariable("OLLAMA_HOST")
-        ?? "http://localhost:11434";
+    private string _model = config.DefaultModel;
 
     public string CurrentModel => _model;
     public void SetModel(string model) => _model = model;
 
-    // Fallback: set BaseAddress if DI didn't configure it
+    // Ensure BaseAddress is set from config
     private void EnsureBaseAddress()
     {
         if (http.BaseAddress == null)
-            http.BaseAddress = new Uri(OllamaUrl);
+            http.BaseAddress = new Uri(config.OllamaUrl);
     }
 
     // ── Streaming chat ──────────────────────────────────────
@@ -105,11 +95,12 @@ public class OllamaService(HttpClient http)
         catch { return []; }
     }
 
-    // ── Health check — short 3 s timeout, no hang ──────────
+    // ── Health check — configurable timeout ────────────────
     public async Task<bool> IsAvailableAsync()
     {
         EnsureBaseAddress();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        using var cts = new CancellationTokenSource(
+            TimeSpan.FromSeconds(config.HealthCheckTimeoutSeconds));
         try
         {
             var resp = await http.GetAsync("/api/tags", cts.Token);
@@ -119,30 +110,29 @@ public class OllamaService(HttpClient http)
     }
 
     // ── Print actionable fix steps to stderr ────────────────
-    public static void PrintConnectionHelp()
+    public void PrintConnectionHelp()
     {
-        var url = OllamaUrl;
         Console.Error.WriteLine();
         Console.Error.WriteLine("┌─ How to fix ──────────────────────────────────────┐");
-        Console.Error.WriteLine($"│  Tried: {url,-43}│");
+        Console.Error.WriteLine($"│  Tried: {config.OllamaUrl,-43}│");
         Console.Error.WriteLine("│                                                    │");
         Console.Error.WriteLine("│  1. Install Ollama → https://ollama.ai             │");
         Console.Error.WriteLine("│  2. Start it       → ollama serve                 │");
         Console.Error.WriteLine("│  3. Pull a model   → ollama pull qwen2.5-coder:7b │");
-        Console.Error.WriteLine("│  4. Custom host?   → OLLAMA_HOST=http://IP:11434  │");
+        Console.Error.WriteLine("│  4. Custom host?   → XKODE_OLLAMA_URL=http://...  │");
         Console.Error.WriteLine("└────────────────────────────────────────────────────┘");
         Console.Error.WriteLine();
     }
 
     // ─── Private ────────────────────────────────────────────
-    private static string BuildConnectionError(HttpRequestException ex)
+    private string BuildConnectionError(HttpRequestException ex)
     {
         var inner = ex.InnerException?.Message ?? ex.Message;
         if (inner.Contains("refused") || inner.Contains("actively refused"))
-            return $"Ollama is not running at {OllamaUrl}.\nStart it with: ollama serve";
+            return $"Ollama is not running at {config.OllamaUrl}.\nStart it with: ollama serve";
         if (inner.Contains("No such host") || inner.Contains("Name or service not known"))
-            return $"Cannot resolve host: {OllamaUrl}.\nCheck your OLLAMA_HOST env var.";
-        return $"Cannot connect to Ollama at {OllamaUrl}.\n{inner}";
+            return $"Cannot resolve host: {config.OllamaUrl}.\nCheck your XKODE_OLLAMA_URL env var.";
+        return $"Cannot connect to Ollama at {config.OllamaUrl}.\n{inner}";
     }
 }
 

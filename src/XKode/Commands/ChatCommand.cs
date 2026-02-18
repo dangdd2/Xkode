@@ -14,7 +14,8 @@ public class ChatCommand(
     OllamaService    ollama,
     FileService      fileService,
     CodeIndexService codeIndex,
-    MarkdownService  markdownService) : AsyncCommand<ChatCommand.Settings>
+    MarkdownService  markdownService,
+    ConfigService    config) : AsyncCommand<ChatCommand.Settings>
 {
     // Docs loaded via /docs or /skill during the session
     private readonly List<MarkdownFile> _loadedDocs = [];
@@ -22,9 +23,8 @@ public class ChatCommand(
     public class Settings : CommandSettings
     {
         [CommandOption("-m|--model")]
-        [Description("Ollama model to use (default: qwen2.5-coder:7b)")]
-        [DefaultValue("qwen2.5-coder:7b")]
-        public string Model { get; set; } = "qwen2.5-coder:7b";
+        [Description("Ollama model to use (default from config)")]
+        public string? Model { get; set; }
 
         [CommandOption("-p|--path")]
         [Description("Project root path (default: current directory)")]
@@ -33,7 +33,7 @@ public class ChatCommand(
 
         [CommandOption("-y|--yes")]
         [Description("Auto-accept all file changes (dangerous!)")]
-        public bool AutoAccept { get; set; } = false;
+        public bool? AutoAccept { get; set; }
 
         [CommandOption("--no-context")]
         [Description("Don't load project files into context")]
@@ -41,12 +41,17 @@ public class ChatCommand(
 
         [CommandOption("--no-skill")]
         [Description("Don't auto-load SKILL.md on startup")]
-        public bool NoSkill { get; set; } = false;
+        public bool? NoSkill { get; set; }
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         Banner.Show();
+
+        // Apply config defaults
+        var model = settings.Model ?? config.DefaultModel;
+        var autoAccept = settings.AutoAccept ?? config.AutoAccept;
+        var noSkill = settings.NoSkill ?? !config.AutoLoadSkill;
 
         // ── Validate Ollama connection ───────────────────────
         AnsiConsole.Markup("[cyan]Connecting to Ollama...[/] ");
@@ -54,12 +59,12 @@ public class ChatCommand(
         if (!isAvailable)
         {
             AnsiConsole.MarkupLine("[bold red]✗[/]");
-            OllamaService.PrintConnectionHelp();
+            ollama.PrintConnectionHelp();
             return 1;
         }
         AnsiConsole.MarkupLine("[bold green]✓[/]");
-        ollama.SetModel(settings.Model);
-        AnsiConsole.MarkupLine($"[bold green]✓ Connected[/] — Model: [cyan]{settings.Model}[/]");
+        ollama.SetModel(model);
+        AnsiConsole.MarkupLine($"[bold green]✓ Connected[/] — Model: [cyan]{model}[/]");
 
         // ── Load project context ─────────────────────────────
         var projectRoot = System.IO.Path.GetFullPath(settings.Path);
@@ -68,12 +73,12 @@ public class ChatCommand(
         if (!settings.NoContext)
         {
             AnsiConsole.Markup($"[cyan]Indexing project:[/] {projectRoot}... ");
-            ctx = fileService.IndexProject(projectRoot);
+            ctx = fileService.IndexProject(projectRoot, config.MaxContextFiles);
             AnsiConsole.MarkupLine($"[bold green]✓[/] [white]{ctx.TotalFiles}[/] files");
         }
 
-        // ── Auto-load SKILL.md if present ───────────────────
-        if (!settings.NoSkill)
+        // ── Auto-load SKILL.md if enabled ───────────────────
+        if (!noSkill)
             AutoLoadSkillFiles(projectRoot);
 
         AnsiConsole.WriteLine();
@@ -91,7 +96,7 @@ public class ChatCommand(
 
         while (true)
         {
-            AnsiConsole.Markup("[bold green]you[/][grey] ❯[/] ");
+            AnsiConsole.Markup("[bold green]you[/][grey] >[/] ");
             var input = Console.ReadLine()?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(input)) continue;
 
@@ -105,7 +110,7 @@ public class ChatCommand(
             // Regular message or injected doc message
             var userContent = injectMessage ?? input;
             history.Add(new ChatMessage { Role = "user", Content = userContent });
-            AnsiConsole.MarkupLine("\n[bold blue]ai[/][grey] ❯[/]");
+            AnsiConsole.MarkupLine("\n[bold blue]ai[/][grey] >[/]");
 
             // ── Stream AI response ───────────────────────────
             var fullResponse = new StringBuilder();
@@ -113,6 +118,7 @@ public class ChatCommand(
 
             try
             {
+                AnsiConsole.MarkupLine("[grey]Thinking...[/]");
                 await foreach (var chunk in ollama.ChatStreamAsync(history, cts.Token))
                 {
                     Console.Write(chunk);
@@ -137,7 +143,7 @@ public class ChatCommand(
             {
                 AnsiConsole.MarkupLine("[bold yellow]⚡ Actions detected:[/]");
                 var results = await codeIndex.ExecuteActionsAsync(
-                    response, projectRoot, settings.AutoAccept, cts.Token);
+                    response, projectRoot, autoAccept, cts.Token);
 
                 foreach (var r in results)
                 {
@@ -265,6 +271,11 @@ public class ChatCommand(
             // ── 📋 /loaded — list loaded docs ────────────────
             case "/loaded":
                 ShowLoadedDocs();
+                return (SlashResult.Handled, null);
+
+            // ── ⚙️ /config — show config ─────────────────────
+            case "/config":
+                config.Print();
                 return (SlashResult.Handled, null);
 
             default:
@@ -479,6 +490,9 @@ public class ChatCommand(
         table.AddRow("[bold white]MODEL[/]",              "");
         table.AddRow("/model",                            "Show current model");
         table.AddRow("/model [cyan]<name>[/]",            "Switch Ollama model");
+        table.AddRow("",                                  "");
+        table.AddRow("[bold white]SETTINGS[/]",           "");
+        table.AddRow("/config",                           "Show current configuration");
         table.AddRow("",                                  "");
         table.AddRow("[bold white]GENERAL[/]",            "");
         table.AddRow("/clear",                            "Clear screen");
