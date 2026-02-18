@@ -53,7 +53,7 @@ public class OllamaService(HttpClient http, ConfigService config)
             throw new OllamaException(BuildConnectionError(ex));
         }
 
-        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);
 
         while (!reader.EndOfStream && !ct.IsCancellationRequested)

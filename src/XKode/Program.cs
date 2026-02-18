@@ -68,11 +68,11 @@ app.Configure(config =>
           .WithExample("config", "env");
 
     // Show banner if no args
-    if (args.Length == 0)
-    {
-        Banner.Show();
-        config.AddCommand<ChatCommand>("chat");
-    }
+    //if (args.Length == 0)
+    //{
+    //    Banner.Show();
+    //    config.AddCommand<ChatCommand>("chat");
+    //}
 });
 
 return await app.RunAsync(args.Length == 0 ? ["chat"] : args);
