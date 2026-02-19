@@ -28,7 +28,7 @@ public class ConfigService
 
     // ── Configuration properties ────────────────────────────
     public string OllamaUrl { get; set; } = "http://localhost:11434";
-    public string DefaultModel { get; set; } = "qwen2.5-coder:7b";
+    public string DefaultModel { get; set; } = "minimax-m2.5:cloud";
     public int MaxContextFiles { get; set; } = 80;
     public bool AutoAccept { get; set; } = false;
     public bool AutoLoadSkill { get; set; } = true;

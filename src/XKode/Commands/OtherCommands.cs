@@ -22,8 +22,9 @@ public class RunCommand(
         public string Task { get; set; } = "";
 
         [CommandOption("-m|--model")]
-        [DefaultValue("qwen2.5-coder:7b")]
-        public string Model { get; set; } = "qwen2.5-coder:7b";
+        [DefaultValue("minimax-m2.5:cloud")]
+        //public string Model { get; set; } = "qwen2.5-coder:7b";
+        public string Model { get; set; } = "minimax-m2.5:cloud";
 
         [CommandOption("-p|--path")]
         [DefaultValue(".")]
@@ -255,6 +256,7 @@ internal sealed class StreamingMarkdownRenderer
     private string _codeLang = "";
     private readonly List<string> _codeLines = new();
     private readonly StringBuilder _lineBuffer = new();
+    private bool _inThinking;
 
     public void ProcessChunk(string chunk)
     {
@@ -291,7 +293,27 @@ internal sealed class StreamingMarkdownRenderer
 
     private void ProcessLine(string line)
     {
-        if (line.TrimStart().StartsWith("```"))
+        if (_inThinking || line.StartsWith("Thinking...", StringComparison.Ordinal))
+        {
+            if (line.StartsWith("Thinking...", StringComparison.Ordinal))
+            {
+                _inThinking = true;
+                AnsiConsole.MarkupLine($"[grey]{Markup.Escape(line)}[/]");
+                return;
+            }
+
+            if (line.StartsWith("...done thinking.", StringComparison.Ordinal))
+            {
+                AnsiConsole.MarkupLine($"[grey]{Markup.Escape(line)}[/]");
+                _inThinking = false;
+                return;
+            }
+
+            AnsiConsole.MarkupLine($"[grey]{Markup.Escape(line)}[/]");
+            return;
+        }
+
+        if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
         {
             if (!_inCode)
             {
