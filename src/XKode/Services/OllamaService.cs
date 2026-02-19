@@ -56,6 +56,9 @@ public class OllamaService(HttpClient http, ConfigService config)
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);
 
+        var thinkingStarted = false;
+        var thinkingCompleted = false;
+
         while (!reader.EndOfStream && !ct.IsCancellationRequested)
         {
             var line = await reader.ReadLineAsync(ct);
@@ -65,10 +68,38 @@ public class OllamaService(HttpClient http, ConfigService config)
             try { chunk = JsonSerializer.Deserialize(line, JsonCtx.Default.ChatStreamChunk); }
             catch { continue; }
 
-            if (chunk?.Message?.Content is { Length: > 0 } text)
-                yield return text;
+            var message = chunk?.Message;
 
-            if (chunk?.Done == true) break;
+            if (message?.Thinking is { Length: > 0 } thinkingText)
+            {
+                if (!thinkingStarted)
+                {
+                    thinkingStarted = true;
+                    yield return "Thinking...\n";
+                }
+
+                yield return thinkingText;
+            }
+
+            if (message?.Content is { Length: > 0 } contentText)
+            {
+                if (thinkingStarted && !thinkingCompleted)
+                {
+                    thinkingCompleted = true;
+                    yield return "\n...done thinking.\n\n";
+                }
+
+                yield return contentText;
+            }
+
+            if (chunk?.Done == true)
+            {
+                if (thinkingStarted && !thinkingCompleted)
+                {
+                    yield return "\n...done thinking.\n\n";
+                }
+                break;
+            }
         }
     }
 
@@ -146,6 +177,9 @@ public class ChatMessage
 
     [JsonPropertyName("content")]
     public string Content { get; set; } = "";
+
+    [JsonPropertyName("thinking")]
+    public string Thinking { get; set; } = "";
 }
 
 public class ChatRequest

@@ -115,16 +115,18 @@ public class ChatCommand(
             // ── Stream AI response ───────────────────────────
             var fullResponse = new StringBuilder();
             var cts = new CancellationTokenSource();
+            var renderer = new StreamingMarkdownRenderer();
 
             try
             {
-                AnsiConsole.MarkupLine("[grey]Thinking...[/]");
+                AnsiConsole.MarkupLine("[grey]Sending...[/]");
                 await foreach (var chunk in ollama.ChatStreamAsync(history, cts.Token))
                 {
-                    Console.Write(chunk);
+                    renderer.ProcessChunk(chunk);
                     fullResponse.Append(chunk);
                 }
-                Console.WriteLine("\n");
+                renderer.Complete();
+                Console.WriteLine();
             }
             catch (OllamaException ex)
             {
