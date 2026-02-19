@@ -148,7 +148,7 @@ public class CodeIndexService(FileService files, ShellService shell)
             Before your main answer, briefly explain what you are about to do:
 
             Thinking...
-            <1–3 short sentences explaining your plan>
+            <1–900 short sentences explaining your plan>
             ...done thinking.
 
             Keep this reasoning concise and high-level.

@@ -124,6 +124,7 @@ public class ChatCommand(
                 {
                     renderer.ProcessChunk(chunk);
                     fullResponse.Append(chunk);
+                    await Task.Delay(100, cts.Token); // 0.1s
                 }
                 renderer.Complete();
                 Console.WriteLine();
