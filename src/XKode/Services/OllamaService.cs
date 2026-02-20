@@ -178,8 +178,9 @@ public class ChatMessage
     [JsonPropertyName("content")]
     public string Content { get; set; } = "";
 
+    // For reasoning-capable models (Ollama "thinking")
     [JsonPropertyName("thinking")]
-    public string Thinking { get; set; } = "";
+    public string? Thinking { get; set; }
 }
 
 public class ChatRequest

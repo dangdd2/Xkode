@@ -1,6 +1,7 @@
 using Spectre.Console;
 using Spectre.Console.Cli;
 using Microsoft.Extensions.DependencyInjection;
+using XKode.Services;
 
 namespace XKode;
 
@@ -22,7 +23,7 @@ public static class Banner
                 .Padding(1, 0));
 
         AnsiConsole.MarkupLine("");
-        AnsiConsole.MarkupLine("  [grey]Version:[/] [white]0.1.0[/]   [grey]|[/]   [grey]Model:[/] [green]minimax-m2.5:cloud[/]   [grey]|[/]   [grey]Privacy:[/] [bold green]100% Local[/]");
+        AnsiConsole.MarkupLine($"  [grey]Version:[/] [white]0.1.0[/]   [grey]|[/]   [grey]Model:[/] [green]{ConfigService.DefaultModelName}[/]   [grey]|[/]   [grey]Privacy:[/] [bold green]100% Local[/]");
         AnsiConsole.MarkupLine("");
         AnsiConsole.MarkupLine("  [grey dim]Type [bold white]/help[/] for commands, [bold white]/exit[/] to quit[/]");
         AnsiConsole.MarkupLine("");

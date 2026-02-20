@@ -20,6 +20,7 @@ namespace XKode.Services;
 // ─────────────────────────────────────────────────────────────
 public class ConfigService
 {
+    public const string DefaultModelName = "minimax-m2.5:cloud";
     private static readonly string ConfigDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".config", "xkode");
@@ -28,11 +29,11 @@ public class ConfigService
 
     // ── Configuration properties ────────────────────────────
     public string OllamaUrl { get; set; } = "http://localhost:11434";
-    public string DefaultModel { get; set; } = "minimax-m2.5:cloud";
-    public int MaxContextFiles { get; set; } = 80;
+    public string DefaultModel { get; set; } = DefaultModelName;
+    public int MaxContextFiles { get; set; } = 8000000;
     public bool AutoAccept { get; set; } = false;
     public bool AutoLoadSkill { get; set; } = true;
-    public int HistoryLimit { get; set; } = 100;
+    public int HistoryLimit { get; set; } = 1000000;
     public string Theme { get; set; } = "dark";
 
     // Advanced

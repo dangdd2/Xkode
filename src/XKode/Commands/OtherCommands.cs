@@ -22,9 +22,8 @@ public class RunCommand(
         public string Task { get; set; } = "";
 
         [CommandOption("-m|--model")]
-        [DefaultValue("minimax-m2.5:cloud")]
-        //public string Model { get; set; } = "qwen2.5-coder:7b";
-        public string Model { get; set; } = "minimax-m2.5:cloud";
+        [DefaultValue(ConfigService.DefaultModelName)]
+        public string Model { get; set; } = ConfigService.DefaultModelName;
 
         [CommandOption("-p|--path")]
         [DefaultValue(".")]

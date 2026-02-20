@@ -45,7 +45,7 @@ app.Configure(config =>
     config.AddCommand<ChatCommand>("chat")
           .WithDescription("Start an interactive AI chat session with your codebase")
           .WithExample("chat")
-          .WithExample("chat", "--model", "minimax-m2.5:cloud")
+          .WithExample("chat", "--model", ConfigService.DefaultModelName)
           .WithExample("chat", "--path", "/my/project");
 
     config.AddCommand<RunCommand>("run")
