@@ -31,7 +31,7 @@ public class ConfigService
     public string OllamaUrl { get; set; } = "http://localhost:11434";
     public string DefaultModel { get; set; } = DefaultModelName;
     public int MaxContextFiles { get; set; } = 8000000;
-    public bool AutoAccept { get; set; } = false;
+    public bool AutoAccept { get; set; } = true;
     public bool AutoLoadSkill { get; set; } = true;
     public int HistoryLimit { get; set; } = 1000000;
     public string Theme { get; set; } = "dark";

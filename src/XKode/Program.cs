@@ -33,13 +33,19 @@ services.AddSingleton<CodeIndexService>();
 services.AddSingleton<ShellService>();
 services.AddSingleton<MarkdownService>();
 
+// Multi-agent services
+services.AddSingleton<XKode.Agents.PlannerAgent>();
+services.AddSingleton<XKode.Agents.ExecutorAgent>();
+services.AddSingleton<XKode.Agents.ReviewerAgent>();
+services.AddSingleton<XKode.Agents.AgentOrchestrator>();
+
 var registrar = new TypeRegistrar(services);
 var app = new CommandApp(registrar);
 
 app.Configure(config =>
 {
     config.SetApplicationName("xkode");
-    config.SetApplicationVersion("0.1.0");
+    config.SetApplicationVersion("0.2.0");
     config.CaseSensitivity(CaseSensitivity.None);
 
     config.AddCommand<ChatCommand>("chat")
@@ -47,6 +53,12 @@ app.Configure(config =>
           .WithExample("chat")
           .WithExample("chat", "--model", ConfigService.DefaultModelName)
           .WithExample("chat", "--path", "/my/project");
+
+    config.AddCommand<AgentCommand>("agent")
+          .WithDescription("Multi-agent mode: Plan → Execute → Review")
+          .WithExample("agent", "\"Add authentication to my app\"")
+          .WithExample("agent", "\"Refactor Services folder\"", "--path", "./src")
+          .WithExample("agent", "\"Write unit tests\"", "--yes");
 
     config.AddCommand<RunCommand>("run")
           .WithDescription("Run a single AI task (non-interactive)")
@@ -66,13 +78,13 @@ app.Configure(config =>
           .WithExample("config")
           .WithExample("config", "init")
           .WithExample("config", "env");
-
-    // Show banner if no args
-    //if (args.Length == 0)
-    //{
-    //    Banner.Show();
-    //    config.AddCommand<ChatCommand>("chat");
-    //}
 });
 
-return await app.RunAsync(args.Length == 0 ? ["chat"] : args);
+string defaultCommand = "chat";
+// for debuging : if no args provided, default to a sample agent command
+if (args.Length == 0)
+{
+    args = new[] {"agent", "add a single app using .net C# about the the minimal API" };
+}
+return await app.RunAsync(args.Length == 0 ? [defaultCommand] : args);
+
