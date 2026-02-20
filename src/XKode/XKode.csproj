@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Description>XKode — Local AI Coding Agent powered by Ollama</Description>
 
     <!-- ✅ Required to install as dotnet tool -->
