@@ -25,6 +25,7 @@ Local AI Coding Agent v0.1.0
 
 | | Feature | Mô tả |
 |---|---|---|
+| 🤖 | **Multi-Agent Mode** | Plan → Execute → Review workflow ✨ NEW |
 | 🗣️ | **Interactive Chat** | REPL với streaming, markdown rendering |
 | 📁 | **Codebase Context** | Index toàn bộ project |
 | ✏️ | **File Editing** | AI sửa file với diff preview |
@@ -56,6 +57,16 @@ xkode chat
 ## 📖 Usage
 
 ```bash
+# 🤖 Multi-Agent Mode (NEW v0.2!)
+xkode agent "Add authentication to my app"
+xkode agent "Refactor Services folder" --path ./src
+xkode agent "Write unit tests" --yes --no-review
+
+# 📝 Plan workflow (export → edit → execute)
+xkode agent "Add auth" --export-plan plan.md    # Export plan
+# Edit plan.md manually
+xkode agent --plan plan.md                      # Execute edited plan
+
 # Interactive chat
 xkode chat
 xkode chat --path /my/project
@@ -76,6 +87,11 @@ xkode review --focus security
 # List models
 xkode models
 ```
+
+**Multi-Agent:** Plan → Execute → Review (for complex tasks)  
+**Single-Agent:** Quick chat/run (for simple tasks)
+
+See [MULTI-AGENT.md](MULTI-AGENT.md) for detailed documentation.
 
 ---
 

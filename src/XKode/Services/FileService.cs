@@ -68,7 +68,7 @@ public class FileService
                 Extension = Path.GetExtension(filePath),
                 Lines = lines,
                 // Only include full content for small files
-                Content = lines <= 200 ? content : TruncateWithSummary(content, relativePath)
+                Content = lines <= 500 ? content : TruncateWithSummary(content, relativePath)
             });
         }
 

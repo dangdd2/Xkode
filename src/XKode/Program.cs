@@ -2,7 +2,6 @@ using XKode;
 using XKode.Commands;
 using XKode.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Spectre.Console;
 using Spectre.Console.Cli;
 
 // ─────────────────────────────────────────────────────────────
@@ -81,10 +80,21 @@ app.Configure(config =>
 });
 
 string defaultCommand = "chat";
-// for debuging : if no args provided, default to a sample agent command
+#if DEBUG
 if (args.Length == 0)
 {
-    args = new[] {"agent", "add a single app using .net C# about the the minimal API" };
+    var promptForTesting = "Add C# code that demo come common design pattern like singleton, abstract, adapter ....";
+    //var promptForTesting = "Add C# code that demo MCP Server tool";
+
+    args =
+    [
+        "agent",
+        promptForTesting,      // Single element
+        "--path", "C:\\Work\\Lab\\test\\csharp",     // Separate elements
+        "--yes",
+        "--no-review"
+    ];
 }
+#endif
 return await app.RunAsync(args.Length == 0 ? [defaultCommand] : args);
 

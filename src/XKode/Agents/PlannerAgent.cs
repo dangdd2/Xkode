@@ -59,7 +59,7 @@ public class PlannerAgent(OllamaService ollama, ConfigService config)
         - Order steps logically (models before controllers, etc.)
         - Be specific about file paths
         - Include tests as separate steps
-        - Maximum 10 steps for any task
+        - Maximum 100 steps for any task
         - If task is too large, break into phases
         
         START YOUR RESPONSE WITH: {
@@ -114,7 +114,7 @@ public class PlannerAgent(OllamaService ollama, ConfigService config)
             if (plan.Steps.Count == 0)
                 throw new AgentException("Plan must have at least one step");
 
-            if (plan.Steps.Count > 10)
+            if (plan.Steps.Count > 100)
                 throw new AgentException("Plan has too many steps (max 10)");
 
             return plan;
