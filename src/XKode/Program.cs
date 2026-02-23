@@ -83,17 +83,35 @@ string defaultCommand = "chat";
 #if DEBUG
 if (args.Length == 0)
 {
-    var promptForTesting = "Add C# code that demo come common design pattern like singleton, abstract, adapter ....";
-    //var promptForTesting = "Add C# code that demo MCP Server tool";
-
+    // execute MODE
     args =
     [
         "agent",
-        promptForTesting,      // Single element
-        "--path", "C:\\Work\\Lab\\test\\csharp",     // Separate elements
+        "Add C# code that demo paypal payment with all common API: make , void payment",      // Single element
+        "--path", "C:\\Work\\Lab\\test\\PaypalPayment",     // Separate elements
         "--yes",
         "--no-review"
     ];
+
+    // export to Mark down file Mode
+    //args =
+    //[
+    //    "agent",
+    //    "create an AI Stock based on the news inputs, system can summarize and make a decision we should BUY or SELL",      // Single element
+    //    "--path", "C:\\Work\\Lab\\test\\vue",     // Separate elements
+    //    "--export-plan", // Save the plan to a file
+    //    "--yes", // auto - approve all steps without prompting
+    //    "--no-review" // skip the review phase (useful for testing just the planner and executor)
+    //];
+    //args =
+    //[
+    //    "agent",
+    //    string.Empty,      // Single element
+    //    "--path", "C:\\Work\\Lab\\test\\csharp",     // Separate elements
+    //    "--yes",
+    //    "--no-review"
+    //];
+
 }
 #endif
 return await app.RunAsync(args.Length == 0 ? [defaultCommand] : args);

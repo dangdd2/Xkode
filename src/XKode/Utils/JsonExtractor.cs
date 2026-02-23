@@ -55,27 +55,78 @@ public static class JsonExtractor
             text = text[7..];
         else if (text.StartsWith("```"))
             text = text[3..];
-        
+
         if (text.EndsWith("```"))
             text = text[..^3];
 
         text = text.Trim();
 
-        // Find JSON object boundaries
+        // Find JSON object boundaries using proper brace matching
         var startIndex = text.IndexOf('{');
-        var endIndex = text.LastIndexOf('}');
+        if (startIndex < 0)
+        {
+            return "{}"; // No opening brace found
+        }
 
-        if (startIndex >= 0 && endIndex > startIndex)
+        var endIndex = FindMatchingBrace(text, startIndex);
+        if (endIndex < 0)
         {
-            text = text[startIndex..(endIndex + 1)];
+            return "{}"; // No matching closing brace
         }
-        else
-        {
-            // No valid JSON brackets found
-            return "{}";
-        }
+
+        text = text[startIndex..(endIndex + 1)];
 
         return text.Trim();
+    }
+
+    /// <summary>
+    /// Find the matching closing brace for an opening brace
+    /// </summary>
+    private static int FindMatchingBrace(string text, int startIndex)
+    {
+        if (startIndex < 0 || startIndex >= text.Length || text[startIndex] != '{')
+            return -1;
+
+        int braceCount = 0;
+        bool inString = false;
+        bool escaped = false;
+
+        for (int i = startIndex; i < text.Length; i++)
+        {
+            char c = text[i];
+
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+
+            if (c == '"')
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString)
+            {
+                if (c == '{')
+                    braceCount++;
+                else if (c == '}')
+                {
+                    braceCount--;
+                    if (braceCount == 0)
+                        return i; // Found matching brace
+                }
+            }
+        }
+
+        return -1; // No matching brace found
     }
 
     /// <summary>

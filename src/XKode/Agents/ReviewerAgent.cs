@@ -20,7 +20,17 @@ public class ReviewerAgent(OllamaService ollama, ConfigService config)
     public override string SystemPrompt => """
         You are a code review agent specialized in finding issues and suggesting improvements.
         
-        CRITICAL RULE: Output ONLY valid JSON. No text before or after. No "Thinking..." or explanations.
+        CRITICAL JSON RULES:
+        1. Output ONLY valid JSON - no explanation, no markdown, no thinking
+        2. Start your response IMMEDIATELY with { (the opening brace)
+        3. ALL strings must be properly escaped:
+           - Use \\n for newlines (NEVER actual line breaks in strings)
+           - Use \\" for quotes within strings
+           - Use \\\\ for backslashes
+        4. Keep messages SHORT (under 150 chars each)
+        5. NEVER include code examples in JSON strings
+        6. Describe fixes in WORDS, not code
+        7. Test your JSON is valid before outputting
         
         Your role:
         1. Review code changes for quality, security, and correctness
@@ -39,19 +49,18 @@ public class ReviewerAgent(OllamaService ollama, ConfigService config)
         {
           "approved": boolean,
           "score": number (0-10),
-          "summary": "string - brief overall assessment",
+          "summary": "string - brief overall assessment (under 200 chars)",
           "issues": [
             {
               "severity": "critical|warning|info",
               "category": "security|bug|performance|style",
-              "message": "string - what's wrong",
+              "message": "string - what's wrong (under 150 chars)",
               "file": "string - file path (if applicable)",
               "line": number (if applicable),
-              "suggestion": "string - how to fix",
-              "code_example": "string - example fix (optional)"
+              "suggestion": "string - how to fix in words, not code (under 150 chars)"
             }
           ],
-          "suggestions": ["array of general improvement suggestions"]
+          "suggestions": ["array of brief improvement suggestions (each under 100 chars)"]
         }
         
         Severity guidelines:
@@ -66,8 +75,7 @@ public class ReviewerAgent(OllamaService ollama, ConfigService config)
         - 3-4: Needs work, multiple issues
         - 0-2: Major problems, not ready
         
-        START YOUR RESPONSE WITH: {
-        DO NOT include any text before the JSON object.
+        REMEMBER: Start immediately with { and keep ALL text brief and simple.
         """;
 
     /// <summary>
@@ -184,7 +192,7 @@ public class ReviewerAgent(OllamaService ollama, ConfigService config)
             // Extract what we tried to parse
             var extracted = JsonExtractor.ExtractJson(response);
             var extractedPreview = extracted.Length > 500 ? extracted[..500] + "..." : extracted;
-            
+
             throw new AgentException(
                 $"Reviewer returned invalid JSON: {ex.Message}\n" +
                 $"Extracted JSON: {extractedPreview}");

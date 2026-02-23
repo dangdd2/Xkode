@@ -34,8 +34,12 @@ public class AgentCommand(
         [Description("Load execution plan from markdown file")]
         public string? PlanFile { get; set; }
 
-        [CommandOption("--export-plan <FILE>")]
-        [Description("Export plan to markdown file and exit (don't execute)")]
+        [CommandOption("--export-plan")]
+        [Description("Export plan to markdown file and exit (auto-generates filename)")]
+        public bool ExportPlan { get; set; }
+
+        [CommandOption("--export-plan-file <FILE>")]
+        [Description("Export plan to specific markdown file")]
         public string? ExportPlanFile { get; set; }
 
         [CommandOption("-p|--path")]
@@ -176,13 +180,30 @@ public class AgentCommand(
             }
 
             // Option 2a: Export plan and exit
-            if (!string.IsNullOrWhiteSpace(settings.ExportPlanFile))
+            if (settings.ExportPlan || !string.IsNullOrWhiteSpace(settings.ExportPlanFile))
             {
+                // Determine filename
+                string filename;
+                if (!string.IsNullOrWhiteSpace(settings.ExportPlanFile))
+                {
+                    // User specified filename with --export-plan-file
+                    filename = Path.IsPathRooted(settings.ExportPlanFile)
+                        ? settings.ExportPlanFile
+                        : Path.Combine(projectRoot, settings.ExportPlanFile);
+                }
+                else
+                {
+                    // Auto-generate filename (--export-plan flag)
+                    filename = GeneratePlanFilename(settings.Task ?? plan.Goal, projectRoot);
+                }
+
                 var markdown = plan.ToMarkdown();
-                File.WriteAllText(settings.ExportPlanFile, markdown);
-                
-                AnsiConsole.MarkupLine($"\n[green]✓ Plan exported to:[/] [cyan]{settings.ExportPlanFile}[/]");
-                AnsiConsole.MarkupLine($"[grey]Edit the plan, then run:[/] xkode agent --plan {settings.ExportPlanFile}");
+                File.WriteAllText(filename, markdown);
+
+                // Show relative path for cleaner output
+                var displayPath = Path.GetRelativePath(projectRoot, filename);
+                AnsiConsole.MarkupLine($"\n[green]✓ Plan exported to:[/] [cyan]{displayPath}[/]");
+                AnsiConsole.MarkupLine($"[grey]Edit the plan, then run:[/] xkode agent --plan {displayPath}");
                 return 0;
             }
         }
@@ -344,5 +365,29 @@ public class AgentCommand(
         }
         
         return codebaseContext;
+    }
+
+    // ── Generate plan filename from task description ─────────
+    private static string GeneratePlanFilename(string task, string projectRoot)
+    {
+        // Summarize task (first 50 chars, clean up)
+        var summary = task.Length > 50 ? task[..50] : task;
+
+        // Remove invalid filename characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+        summary = string.Join("_", summary.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+
+        // Replace spaces with hyphens, remove multiple spaces/hyphens
+        summary = System.Text.RegularExpressions.Regex.Replace(summary, @"\s+", "-");
+        summary = System.Text.RegularExpressions.Regex.Replace(summary, @"-+", "-");
+        summary = summary.Trim('-').ToLower();
+
+        // Add timestamp
+        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+
+        var filename = $"plan-{summary}-{timestamp}.md";
+
+        // Combine with project root
+        return Path.Combine(projectRoot, filename);
     }
 }

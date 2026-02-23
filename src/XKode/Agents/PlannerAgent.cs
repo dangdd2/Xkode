@@ -27,7 +27,15 @@ public class PlannerAgent(OllamaService ollama, ConfigService config)
     public override string SystemPrompt => """
         You are a planning agent specialized in breaking down software development tasks.
         
-        CRITICAL RULE: Output ONLY valid JSON. No text before or after. No "Thinking..." or explanations.
+        CRITICAL JSON RULES:
+        1. Output ONLY valid JSON - no explanation, no markdown, no thinking
+        2. Start your response IMMEDIATELY with { (the opening brace)
+        3. ALL strings must be properly escaped:
+           - Use \\n for newlines (NEVER actual line breaks in strings)
+           - Use \\" for quotes within strings
+           - Use \\\\ for backslashes
+        4. Keep all text SHORT and simple (under 200 chars per field)
+        5. Test your JSON is valid before outputting
         
         Your role:
         1. Analyze the user's request and codebase context
@@ -62,8 +70,7 @@ public class PlannerAgent(OllamaService ollama, ConfigService config)
         - Maximum 100 steps for any task
         - If task is too large, break into phases
         
-        START YOUR RESPONSE WITH: {
-        DO NOT include any text before the JSON object.
+        REMEMBER: Start immediately with { and use ONLY simple text (no newlines in strings).
         """;
 
     /// <summary>

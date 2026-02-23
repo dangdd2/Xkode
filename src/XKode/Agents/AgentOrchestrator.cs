@@ -154,8 +154,15 @@ public class AgentOrchestrator(
                     }
                     catch (AgentException ex)
                     {
-                        // Review failed - log but continue
-                        AnsiConsole.MarkupLine($"[yellow]⚠️  Review skipped: {Markup.Escape(ex.Message)}[/]");
+                        // Review failed due to JSON parsing
+                        AnsiConsole.MarkupLine($"[yellow]⚠️  Review skipped (JSON parse error)[/]");
+                        AnsiConsole.MarkupLine($"[grey]The reviewer produced invalid JSON. Continuing without review.[/]");
+
+                        // Optionally log to file for debugging
+                        if (System.Diagnostics.Debugger.IsAttached)
+                        {
+                            Console.WriteLine($"[DEBUG] Review error: {ex.Message}");
+                        }
                     }
                 }
             }

@@ -54,13 +54,17 @@ public class MarkdownService
     // ── Discover SKILL.md files in a project root ──────────
     public List<string> FindSkillFiles(string projectRoot)
     {
-        var found = new List<string>();
+        var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Check standard paths
         foreach (var relative in SkillSearchPaths)
         {
             var full = Path.Combine(projectRoot, relative);
-            if (File.Exists(full)) found.Add(full);
+            if (File.Exists(full))
+            {
+                // Normalize path to avoid duplicates
+                found.Add(Path.GetFullPath(full));
+            }
         }
 
         // Also scan recursively for any SKILL.md
@@ -69,12 +73,17 @@ public class MarkdownService
             var scanned = Directory
                 .EnumerateFiles(projectRoot, "SKILL.md", SearchOption.AllDirectories)
                 .Where(p => !p.Contains(".git") && !p.Contains("node_modules"))
+                .Select(p => Path.GetFullPath(p))  // Normalize paths
                 .Where(p => !found.Contains(p));
-            found.AddRange(scanned);
+
+            foreach (var path in scanned)
+            {
+                found.Add(path);
+            }
         }
         catch { /* ignore permission errors */ }
 
-        return found.Distinct().ToList();
+        return found.ToList();
     }
 
     // ── Discover all .md files in a project ─────────────────
