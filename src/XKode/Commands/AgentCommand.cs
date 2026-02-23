@@ -2,6 +2,7 @@ using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
 using XKode.Agents;
+using XKode.Models;
 using XKode.Services;
 
 namespace XKode.Commands;
@@ -25,9 +26,21 @@ public class AgentCommand(
 {
     public class Settings : CommandSettings
     {
-        [CommandArgument(0, "<task>")]
-        [Description("Task to execute using multi-agent workflow")]
-        public string Task { get; set; } = "";
+        [CommandArgument(0, "[task]")]
+        [Description("Task to execute using multi-agent workflow (optional if --plan is used)")]
+        public string? Task { get; set; }
+
+        [CommandOption("--plan <FILE>")]
+        [Description("Load execution plan from markdown file")]
+        public string? PlanFile { get; set; }
+
+        [CommandOption("--export-plan")]
+        [Description("Export plan to markdown file and exit (auto-generates filename)")]
+        public bool ExportPlan { get; set; }
+
+        [CommandOption("--export-plan-file <FILE>")]
+        [Description("Export plan to specific markdown file")]
+        public string? ExportPlanFile { get; set; }
 
         [CommandOption("-p|--path")]
         [Description("Project root path (default: current directory)")]
@@ -40,7 +53,7 @@ public class AgentCommand(
 
         [CommandOption("-y|--yes")]
         [Description("Auto-approve all steps (dangerous!)")]
-        public bool AutoApprove { get; set; } = true;
+        public bool AutoApprove { get; set; } = false;
 
         [CommandOption("--no-review")]
         [Description("Skip code review steps")]
@@ -63,10 +76,13 @@ public class AgentCommand(
     {
         Banner.Show();
 
-        if (string.IsNullOrWhiteSpace(settings.Task))
+        // Validate: need either task or plan file
+        if (string.IsNullOrWhiteSpace(settings.Task) && string.IsNullOrWhiteSpace(settings.PlanFile))
         {
-            AnsiConsole.MarkupLine("[red]Error: Task is required[/]");
-            AnsiConsole.MarkupLine("[grey]Usage: xkode agent \"Add authentication\"[/]");
+            AnsiConsole.MarkupLine("[red]Error: Either <task> or --plan is required[/]");
+            AnsiConsole.MarkupLine("[grey]Usage:[/]");
+            AnsiConsole.MarkupLine("  xkode agent \"Add authentication\"");
+            AnsiConsole.MarkupLine("  xkode agent --plan plan.md");
             return 1;
         }
 
@@ -102,24 +118,108 @@ public class AgentCommand(
         var executor = new ExecutorAgent(ollama, config, codeIndex, fileService);
         var reviewer = new ReviewerAgent(ollama, config);
 
-        // Update reviewer behavior based on --no-review flag
-        if (settings.NoReview)
-        {
-            config.AutoLoadSkill = false; // Temporary disable for this run
-        }
-
         var orchestrator = new AgentOrchestrator(planner, executor, reviewer, fileService, config);
 
         // ── Load SKILL.md if present ─────────────────────────
         var projectRoot = System.IO.Path.GetFullPath(settings.Path);
-        if (config.AutoLoadSkill && !settings.NoReview)
+        string skillContent = "";
+
+        if (config.AutoLoadSkill)
         {
-            AutoLoadSkillFiles(projectRoot);
+            skillContent = AutoLoadSkillFiles(projectRoot);
+            orchestrator.SetSkillContent(skillContent); // Pass SKILL to orchestrator
         }
 
-        // ── Execute multi-agent workflow ─────────────────────
+        // Update orchestrator behavior based on --no-review flag
+        if (settings.NoReview)
+        {
+            // Disable review in orchestrator (but keep SKILL for planner/executor)
+            orchestrator.DisableReview();
+        }
+
+        // ── Plan workflow: Import, Create, or Export ─────────
+        ExecutionPlan? plan = null;
+
+        // Option 1: Load plan from file
+        if (!string.IsNullOrWhiteSpace(settings.PlanFile))
+        {
+            AnsiConsole.MarkupLine($"[cyan]Loading plan from:[/] {settings.PlanFile}");
+            
+            if (!File.Exists(settings.PlanFile))
+            {
+                AnsiConsole.MarkupLine($"[red]Error: Plan file not found: {settings.PlanFile}[/]");
+                return 1;
+            }
+
+            try
+            {
+                var markdown = File.ReadAllText(settings.PlanFile);
+                plan = ExecutionPlanExtensions.FromMarkdown(markdown);
+                AnsiConsole.MarkupLine($"[green]✓ Loaded plan with {plan.Steps.Count} steps[/]");
+            }
+            catch (Exception ex)
+            {
+                AnsiConsole.MarkupLine($"[red]Error parsing plan file: {Markup.Escape(ex.Message)}[/]");
+                return 1;
+            }
+        }
+        // Option 2: Create new plan
+        else
+        {
+            AnsiConsole.MarkupLine($"\n[bold cyan]🤖 Creating execution plan...[/]");
+            var newContext = BuildCodebaseContext(projectRoot, skillContent);
+            
+            try
+            {
+                plan = await planner.CreatePlanAsync(settings.Task, newContext);
+            }
+            catch (AgentException ex)
+            {
+                AnsiConsole.MarkupLine($"[red]Planning failed: {Markup.Escape(ex.Message)}[/]");
+                return 1;
+            }
+
+            // Option 2a: Export plan and exit
+            if (settings.ExportPlan || !string.IsNullOrWhiteSpace(settings.ExportPlanFile))
+            {
+                // Determine filename
+                string filename;
+                if (!string.IsNullOrWhiteSpace(settings.ExportPlanFile))
+                {
+                    // User specified filename with --export-plan-file
+                    filename = Path.IsPathRooted(settings.ExportPlanFile)
+                        ? settings.ExportPlanFile
+                        : Path.Combine(projectRoot, settings.ExportPlanFile);
+                }
+                else
+                {
+                    // Auto-generate filename (--export-plan flag)
+                    filename = GeneratePlanFilename(settings.Task ?? plan.Goal, projectRoot);
+                }
+
+                var markdown = plan.ToMarkdown();
+                File.WriteAllText(filename, markdown);
+
+                // Show relative path for cleaner output
+                var displayPath = Path.GetRelativePath(projectRoot, filename);
+                AnsiConsole.MarkupLine($"\n[green]✓ Plan exported to:[/] [cyan]{displayPath}[/]");
+                AnsiConsole.MarkupLine($"[grey]Edit the plan, then run:[/] xkode agent --plan {displayPath}");
+                return 0;
+            }
+        }
+
+        // ── Execute the plan ──────────────────────────────────
         AnsiConsole.MarkupLine($"\n[bold cyan]🤖 Multi-Agent Mode[/]");
-        AnsiConsole.MarkupLine($"[grey]Task:[/] {Markup.Escape(settings.Task)}");
+        
+        if (!string.IsNullOrWhiteSpace(settings.Task))
+        {
+            AnsiConsole.MarkupLine($"[grey]Task:[/] {Markup.Escape(settings.Task)}");
+        }
+        else if (plan != null)
+        {
+            AnsiConsole.MarkupLine($"[grey]Task:[/] {Markup.Escape(plan.Goal)}");
+        }
+        
         AnsiConsole.MarkupLine($"[grey]Project:[/] {projectRoot}");
 
         if (settings.AutoApprove)
@@ -139,11 +239,25 @@ public class AgentCommand(
 
         try
         {
-            var result = await orchestrator.ExecuteTaskAsync(
-                settings.Task,
-                projectRoot,
-                settings.AutoApprove,
-                cts.Token);
+            OrchestratorResult result;
+
+            // Execute with pre-made plan or create new one
+            if (plan != null)
+            {
+                result = await orchestrator.ExecutePlanAsync(
+                    plan,
+                    projectRoot,
+                    settings.AutoApprove,
+                    cts.Token);
+            }
+            else
+            {
+                result = await orchestrator.ExecuteTaskAsync(
+                    settings.Task ?? "",
+                    projectRoot,
+                    settings.AutoApprove,
+                    cts.Token);
+            }
 
             // ── Display final result ─────────────────────────
             AnsiConsole.WriteLine();
@@ -213,12 +327,14 @@ public class AgentCommand(
     }
 
     // ── Auto-load SKILL.md ───────────────────────────────────
-    private void AutoLoadSkillFiles(string projectRoot)
+    private string AutoLoadSkillFiles(string projectRoot)
     {
         var skillFiles = markdownService.FindSkillFiles(projectRoot);
-        if (skillFiles.Count == 0) return;
+        if (skillFiles.Count == 0) return "";
 
         AnsiConsole.MarkupLine("\n[cyan]Loading SKILL files...[/]");
+        
+        var skillContent = new System.Text.StringBuilder();
         foreach (var path in skillFiles)
         {
             var md = markdownService.ReadMarkdown(path);
@@ -226,6 +342,52 @@ public class AgentCommand(
 
             var rel = System.IO.Path.GetRelativePath(projectRoot, path);
             AnsiConsole.MarkupLine($"  [green]✓[/] {rel}");
+            
+            // Accumulate SKILL content
+            skillContent.AppendLine($"\n=== SKILL: {rel} ===");
+            skillContent.AppendLine(md.RawContent);
+            skillContent.AppendLine("=== END SKILL ===\n");
         }
+        
+        return skillContent.ToString();
+    }
+
+    // ── Build codebase context ───────────────────────────────
+    private string BuildCodebaseContext(string projectRoot, string skillContent = "")
+    {
+        var ctx = fileService.IndexProject(projectRoot, config.MaxContextFiles);
+        var codebaseContext = ctx.ToPromptContext(maxChars: 30_000);
+        
+        // Prepend SKILL content if available
+        if (!string.IsNullOrWhiteSpace(skillContent))
+        {
+            return skillContent + "\n\n" + codebaseContext;
+        }
+        
+        return codebaseContext;
+    }
+
+    // ── Generate plan filename from task description ─────────
+    private static string GeneratePlanFilename(string task, string projectRoot)
+    {
+        // Summarize task (first 50 chars, clean up)
+        var summary = task.Length > 50 ? task[..50] : task;
+
+        // Remove invalid filename characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+        summary = string.Join("_", summary.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+
+        // Replace spaces with hyphens, remove multiple spaces/hyphens
+        summary = System.Text.RegularExpressions.Regex.Replace(summary, @"\s+", "-");
+        summary = System.Text.RegularExpressions.Regex.Replace(summary, @"-+", "-");
+        summary = summary.Trim('-').ToLower();
+
+        // Add timestamp
+        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+
+        var filename = $"plan-{summary}-{timestamp}.md";
+
+        // Combine with project root
+        return Path.Combine(projectRoot, filename);
     }
 }

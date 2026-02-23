@@ -67,18 +67,21 @@ public class ExecutorAgent(
             var input = BuildExecutorInput(step, projectRoot, codebaseContext);
             var response = await ExecuteAsync(input, ct);
 
-            step.Result = response;
+            // Clean response to remove "Thinking..." blocks
+            var cleanedResponse = CleanResponse(response);
+
+            step.Result = cleanedResponse;
             step.Completed = true;
             step.CompletedAt = DateTime.UtcNow;
 
             // Parse and apply changes
             var actions = await codeIndex.ExecuteActionsAsync(
-                response, projectRoot, autoApprove, ct);
+                cleanedResponse, projectRoot, autoApprove, ct);
 
             return new ExecutionStepResult
             {
                 Step = step,
-                Response = response,
+                Response = cleanedResponse,
                 Actions = actions,
                 Success = !actions.Any(a => !a.Success)
             };
@@ -137,6 +140,46 @@ public class ExecutorAgent(
 
         sb.AppendLine("\nImplement this step now using ```write:path syntax for file changes.");
         return sb.ToString();
+    }
+
+    // ─── Clean Response Helper ─────────────────────────────────
+    private static string CleanResponse(string response)
+    {
+        // Remove "Thinking..." sections that some models add
+        var lines = response.Split('\n');
+        var cleanedLines = new List<string>();
+        bool inThinkingBlock = false;
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+
+            // Detect start of thinking blocks
+            if (trimmed.StartsWith("Thinking", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("...thinking", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Let me think", StringComparison.OrdinalIgnoreCase))
+            {
+                inThinkingBlock = true;
+                continue;
+            }
+
+            // Detect end of thinking blocks
+            if (trimmed.StartsWith("...done thinking", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Done thinking", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Now I will", StringComparison.OrdinalIgnoreCase))
+            {
+                inThinkingBlock = false;
+                continue;
+            }
+
+            // Skip lines that are part of thinking blocks
+            if (!inThinkingBlock)
+            {
+                cleanedLines.Add(line);
+            }
+        }
+
+        return string.Join('\n', cleanedLines).Trim();
     }
 }
 

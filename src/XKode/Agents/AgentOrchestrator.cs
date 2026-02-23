@@ -24,6 +24,24 @@ public class AgentOrchestrator(
     ConfigService config)
 {
     private readonly List<ExecutionStepResult> _stepResults = [];
+    private string _skillContent = ""; // SKILL.md instructions
+    private bool _reviewEnabled = true; // Review enabled by default
+
+    /// <summary>
+    /// Set SKILL content to be included in all agent contexts
+    /// </summary>
+    public void SetSkillContent(string skillContent)
+    {
+        _skillContent = skillContent;
+    }
+
+    /// <summary>
+    /// Disable code review (for --no-review flag)
+    /// </summary>
+    public void DisableReview()
+    {
+        _reviewEnabled = false;
+    }
 
     /// <summary>
     /// Execute a complete multi-agent task
@@ -43,6 +61,33 @@ public class AgentOrchestrator(
             var context = BuildCodebaseContext(projectRoot);
             var plan = await planner.CreatePlanAsync(userRequest, context, ct);
             result.Plan = plan;
+
+            return await ExecutePlanAsync(plan, projectRoot, autoApprove, ct, result);
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"\n[red]Error:[/] {Markup.Escape(ex.Message)}");
+            result.Success = false;
+            result.Error = ex.Message;
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Execute a pre-made execution plan
+    /// </summary>
+    public async Task<OrchestratorResult> ExecutePlanAsync(
+        ExecutionPlan plan,
+        string projectRoot,
+        bool autoApprove = false,
+        CancellationToken ct = default,
+        OrchestratorResult? result = null)
+    {
+        result ??= new OrchestratorResult { UserRequest = plan.Goal, Plan = plan };
+
+        try
+        {
+            var context = BuildCodebaseContext(projectRoot);
 
             DisplayPlan(plan);
 
@@ -77,7 +122,7 @@ public class AgentOrchestrator(
                 }
 
                 // Phase 3: Review after each step (if enabled)
-                if (config.AutoLoadSkill) // Reusing config flag for auto-review
+                if (_reviewEnabled)
                 {
                     try
                     {
@@ -109,8 +154,15 @@ public class AgentOrchestrator(
                     }
                     catch (AgentException ex)
                     {
-                        // Review failed - log but continue
-                        AnsiConsole.MarkupLine($"[yellow]⚠️  Review skipped: {Markup.Escape(ex.Message)}[/]");
+                        // Review failed due to JSON parsing
+                        AnsiConsole.MarkupLine($"[yellow]⚠️  Review skipped (JSON parse error)[/]");
+                        AnsiConsole.MarkupLine($"[grey]The reviewer produced invalid JSON. Continuing without review.[/]");
+
+                        // Optionally log to file for debugging
+                        if (System.Diagnostics.Debugger.IsAttached)
+                        {
+                            Console.WriteLine($"[DEBUG] Review error: {ex.Message}");
+                        }
                     }
                 }
             }
@@ -248,7 +300,15 @@ public class AgentOrchestrator(
     private string BuildCodebaseContext(string projectRoot)
     {
         var ctx = fileService.IndexProject(projectRoot, config.MaxContextFiles);
-        return ctx.ToPromptContext(maxChars: 30_000); // Limit context size
+        var codebaseContext = ctx.ToPromptContext(maxChars: 30_000); // Limit context size
+
+        // Prepend SKILL content if available
+        if (!string.IsNullOrWhiteSpace(_skillContent))
+        {
+            return _skillContent + "\n\n" + codebaseContext;
+        }
+
+        return codebaseContext;
     }
 }
 

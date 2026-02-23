@@ -53,6 +53,6 @@ public class ReviewIssue
     [JsonPropertyName("suggestion")]
     public string? Suggestion { get; set; }
 
-    [JsonPropertyName("code_example")]
-    public string? CodeExample { get; set; }
+    //[JsonPropertyName("code_example")]
+    //public string? CodeExample { get; set; }
 }

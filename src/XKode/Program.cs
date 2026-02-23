@@ -2,7 +2,6 @@ using XKode;
 using XKode.Commands;
 using XKode.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Spectre.Console;
 using Spectre.Console.Cli;
 
 // ─────────────────────────────────────────────────────────────
@@ -81,10 +80,39 @@ app.Configure(config =>
 });
 
 string defaultCommand = "chat";
-// for debuging : if no args provided, default to a sample agent command
+#if DEBUG
 if (args.Length == 0)
 {
-    args = new[] {"agent", "add a single app using .net C# about the the minimal API" };
+    // execute MODE
+    args =
+    [
+        "agent",
+        "Add C# code that demo paypal payment with all common API: make , void payment",      // Single element
+        "--path", "C:\\Work\\Lab\\test\\PaypalPayment",     // Separate elements
+        "--yes",
+        "--no-review"
+    ];
+
+    // export to Mark down file Mode
+    //args =
+    //[
+    //    "agent",
+    //    "create an AI Stock based on the news inputs, system can summarize and make a decision we should BUY or SELL",      // Single element
+    //    "--path", "C:\\Work\\Lab\\test\\vue",     // Separate elements
+    //    "--export-plan", // Save the plan to a file
+    //    "--yes", // auto - approve all steps without prompting
+    //    "--no-review" // skip the review phase (useful for testing just the planner and executor)
+    //];
+    //args =
+    //[
+    //    "agent",
+    //    string.Empty,      // Single element
+    //    "--path", "C:\\Work\\Lab\\test\\csharp",     // Separate elements
+    //    "--yes",
+    //    "--no-review"
+    //];
+
 }
+#endif
 return await app.RunAsync(args.Length == 0 ? [defaultCommand] : args);
 
