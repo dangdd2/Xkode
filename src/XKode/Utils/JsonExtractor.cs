@@ -55,7 +55,7 @@ public static class JsonExtractor
             text = text[7..];
         else if (text.StartsWith("```"))
             text = text[3..];
-
+        
         if (text.EndsWith("```"))
             text = text[..^3];
 

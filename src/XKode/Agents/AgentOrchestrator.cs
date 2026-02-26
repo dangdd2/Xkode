@@ -128,6 +128,9 @@ public class AgentOrchestrator(
                     {
                         var review = await reviewer.ReviewStepAsync(stepResult, context, ct);
 
+                        // Auto-save review to docs/reviews
+                        await AutoSaveReview(review, step.Description, projectRoot);
+
                         if (review.HasCriticalIssues())
                         {
                             AnsiConsole.MarkupLine($"\n[red]⚠️  Critical issues found![/]");
@@ -309,6 +312,117 @@ public class AgentOrchestrator(
         }
 
         return codebaseContext;
+    }
+
+    // ─── Auto-save Review ───────────────────────────────────────
+    private async Task AutoSaveReview(ReviewResult review, string stepDescription, string projectRoot)
+    {
+        try
+        {
+            // Create docs/reviews directory
+            var reviewsDir = Path.Combine(projectRoot, "docs", "reviews");
+            Directory.CreateDirectory(reviewsDir);
+
+            // Generate filename
+            var sanitizedStep = SanitizeFilename(stepDescription);
+            var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var filename = $"{sanitizedStep}-{timestamp}.md";
+            var fullPath = Path.Combine(reviewsDir, filename);
+
+            // Build review markdown
+            var markdown = BuildReviewMarkdown(review, stepDescription);
+            await File.WriteAllTextAsync(fullPath, markdown);
+
+            var relativePath = Path.GetRelativePath(projectRoot, fullPath);
+            AnsiConsole.MarkupLine($"[grey]📝 Review saved: {relativePath}[/]");
+        }
+        catch (Exception ex)
+        {
+            // Silently fail - don't interrupt workflow
+            if (System.Diagnostics.Debugger.IsAttached)
+            {
+                Console.WriteLine($"[DEBUG] Could not save review: {ex.Message}");
+            }
+        }
+    }
+
+    private static string SanitizeFilename(string input)
+    {
+        var sanitized = input.Length > 50 ? input[..50] : input;
+        var invalidChars = Path.GetInvalidFileNameChars();
+        sanitized = string.Join("-", sanitized.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"\s+", "-");
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"-+", "-");
+        return sanitized.Trim('-').ToLower();
+    }
+
+    private static string BuildReviewMarkdown(ReviewResult review, string stepDescription)
+    {
+        var sb = new System.Text.StringBuilder();
+        
+        sb.AppendLine($"# Code Review: {stepDescription}");
+        sb.AppendLine();
+        sb.AppendLine($"**Date:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"**Status:** {(review.Approved ? "✅ Approved" : "❌ Needs Work")}");
+        sb.AppendLine($"**Score:** {review.Score}/10");
+        sb.AppendLine();
+        
+        sb.AppendLine("## Summary");
+        sb.AppendLine();
+        sb.AppendLine(review.Summary);
+        sb.AppendLine();
+        
+        if (review.Issues.Count > 0)
+        {
+            sb.AppendLine("## Issues Found");
+            sb.AppendLine();
+            
+            foreach (var issue in review.Issues)
+            {
+                var icon = issue.Severity switch
+                {
+                    "critical" => "🔴",
+                    "warning" => "🟡",
+                    _ => "🔵"
+                };
+                
+                sb.AppendLine($"### {icon} {issue.Severity.ToUpper()}: {issue.Message}");
+                sb.AppendLine();
+                sb.AppendLine($"**Category:** {issue.Category}");
+                
+                if (!string.IsNullOrWhiteSpace(issue.File))
+                {
+                    sb.AppendLine($"**File:** `{issue.File}`");
+                    if (issue.Line.HasValue)
+                    {
+                        sb.AppendLine($"**Line:** {issue.Line.Value}");
+                    }
+                }
+                
+                if (!string.IsNullOrWhiteSpace(issue.Suggestion))
+                {
+                    sb.AppendLine();
+                    sb.AppendLine($"**Suggestion:** {issue.Suggestion}");
+                }
+                
+                sb.AppendLine();
+            }
+        }
+        
+        if (review.Suggestions.Count > 0)
+        {
+            sb.AppendLine("## General Suggestions");
+            sb.AppendLine();
+            
+            foreach (var suggestion in review.Suggestions)
+            {
+                sb.AppendLine($"- {suggestion}");
+            }
+            
+            sb.AppendLine();
+        }
+        
+        return sb.ToString();
     }
 }
 

@@ -7,15 +7,15 @@ using System.Text;
 namespace XKode.Commands;
 
 // ─────────────────────────────────────────────────────────────
-//  ChatCommand — Interactive REPL (the main feature)
+//  AskCommand — Interactive REPL (the main feature)
 //  New: /docs /skill /loaded — read & inject markdown files
 // ─────────────────────────────────────────────────────────────
-public class ChatCommand(
+public class AskCommand(
     OllamaService    ollama,
     FileService      fileService,
     CodeIndexService codeIndex,
     MarkdownService  markdownService,
-    ConfigService    config) : AsyncCommand<ChatCommand.Settings>
+    ConfigService    config) : AsyncCommand<AskCommand.Settings>
 {
     // Docs loaded via /docs or /skill during the session
     private readonly List<MarkdownFile> _loadedDocs = [];

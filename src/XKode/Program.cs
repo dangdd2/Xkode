@@ -44,65 +44,53 @@ var app = new CommandApp(registrar);
 app.Configure(config =>
 {
     config.SetApplicationName("xkode");
-    config.SetApplicationVersion("0.2.0");
+    config.SetApplicationVersion("0.3.0");
     config.CaseSensitivity(CaseSensitivity.None);
 
-    config.AddCommand<ChatCommand>("chat")
-          .WithDescription("Start an interactive AI chat session with your codebase")
-          .WithExample("chat")
-          .WithExample("chat", "--model", ConfigService.DefaultModelName)
-          .WithExample("chat", "--path", "/my/project");
+    config.AddCommand<AskCommand>("ask")
+          .WithDescription("Start an interactive AI conversation with your codebase")
+          .WithExample("ask")
+          .WithExample("ask", "--model", ConfigService.DefaultModelName)
+          .WithExample("ask", "--path", "/my/project");
 
     config.AddCommand<AgentCommand>("agent")
-          .WithDescription("Multi-agent mode: Plan → Execute → Review")
+          .WithDescription("Multi-agent mode: Plan → Execute → Review (REPL)")
+          .WithExample("agent")
           .WithExample("agent", "\"Add authentication to my app\"")
           .WithExample("agent", "\"Refactor Services folder\"", "--path", "./src")
-          .WithExample("agent", "\"Write unit tests\"", "--yes");
-
-    config.AddCommand<RunCommand>("run")
-          .WithDescription("Run a single AI task (non-interactive)")
-          .WithExample("run", "\"Explain this codebase\"")
-          .WithExample("run", "\"Add error handling to Program.cs\"");
-
-    config.AddCommand<ReviewCommand>("review")
-          .WithDescription("AI code review for a file or the whole project")
-          .WithExample("review", "src/MyClass.cs")
-          .WithExample("review", "--path", ".");
-
-    config.AddCommand<ModelsCommand>("models")
-          .WithDescription("List available Ollama models");
+          .WithExample("agent", "--yes", "--no-review");
 
     config.AddCommand<ConfigCommand>("config")
-          .WithDescription("View or initialize configuration")
+          .WithDescription("View or manage configuration")
           .WithExample("config")
-          .WithExample("config", "init")
-          .WithExample("config", "env");
+          .WithExample("config", "set", "model", "qwen2.5-coder:32b")
+          .WithExample("config", "get", "model");
 });
 
-string defaultCommand = "chat";
+string defaultCommand = "ask";
 #if DEBUG
-if (args.Length == 0)
+if (false && args.Length == 0)
 {
     // execute MODE
     args =
     [
         "agent",
-        "Add C# code that demo paypal payment with all common API: make , void payment",      // Single element
-        "--path", "C:\\Work\\Lab\\test\\PaypalPayment",     // Separate elements
+        "Add C# code that demo come common design pattern like singleton, abstract, adapter ....",      // Single element
+        "--path", "C:\\Work\\Lab\\test\\csharp",     // Separate elements
         "--yes",
         "--no-review"
     ];
 
     // export to Mark down file Mode
-    //args =
-    //[
-    //    "agent",
-    //    "create an AI Stock based on the news inputs, system can summarize and make a decision we should BUY or SELL",      // Single element
-    //    "--path", "C:\\Work\\Lab\\test\\vue",     // Separate elements
-    //    "--export-plan", // Save the plan to a file
-    //    "--yes", // auto - approve all steps without prompting
-    //    "--no-review" // skip the review phase (useful for testing just the planner and executor)
-    //];
+    args =
+    [
+        "agent",
+        "create an AI Stock based on the news inputs, system can summarize and make a decision we should BUY or SELL",      // Single element
+        "--path", "C:\\Work\\Lab\\test\\vue",     // Separate elements
+        "--export-plan", // Save the plan to a file
+        "--yes", // auto - approve all steps without prompting
+        "--no-review" // skip the review phase (useful for testing just the planner and executor)
+    ];
     //args =
     //[
     //    "agent",

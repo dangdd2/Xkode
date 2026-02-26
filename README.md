@@ -23,15 +23,15 @@ Local AI Coding Agent v0.1.0
 
 ## ✨ Features
 
-| | Feature | Mô tả |
+| | Feature | Description |
 |---|---|---|
-| 🤖 | **Multi-Agent Mode** | Plan → Execute → Review workflow ✨ NEW |
-| 🗣️ | **Interactive Chat** | REPL với streaming, markdown rendering |
-| 📁 | **Codebase Context** | Index toàn bộ project |
-| ✏️ | **File Editing** | AI sửa file với diff preview |
-| 💻 | **Shell Execution** | Chạy commands an toàn |
-| 🔍 | **Code Review** | AI review với severity rating |
-| 📄 | **SKILL/Docs Reader** | Load `.md` vào context |
+| 🤖 | **Multi-Agent Mode** | Interactive REPL: Plan → Execute → Review ✨ NEW |
+| 🗣️ | **Interactive Ask** | REPL with streaming, markdown rendering |
+| 📁 | **Codebase Context** | Indexes entire project automatically |
+| ✏️ | **File Editing** | AI edits files with diff preview |
+| 💻 | **Shell Execution** | Safe command execution |
+| 📄 | **SKILL/Docs Reader** | Load `.md` files into context |
+| 📝 | **Auto-Documentation** | Plans & reviews saved to docs/ ✨ NEW |
 | 🔒 | **100% Local** | Zero API cost |
 
 ---
@@ -49,7 +49,7 @@ dotnet pack -c Release -o ./nupkg
 dotnet tool install --global --add-source ./nupkg XKode
 
 # 3. Run
-xkode chat
+xkode ask
 ```
 
 ---
@@ -57,10 +57,23 @@ xkode chat
 ## 📖 Usage
 
 ```bash
-# 🤖 Multi-Agent Mode (NEW v0.2!)
+# 🤖 Multi-Agent Mode (NEW v0.3 - Interactive!)
+# Start interactive mode
+xkode agent
+
+# Execute task then stay interactive
 xkode agent "Add authentication to my app"
-xkode agent "Refactor Services folder" --path ./src
-xkode agent "Write unit tests" --yes --no-review
+
+# 📄 Auto-saved documentation:
+# - Plans saved to: docs/plans/
+# - Reviews saved to: docs/reviews/
+
+# Inside interactive mode:
+# Agent [[planner]] > Add rate limiting
+# Agent [[planner]] > /switch executor
+# Agent [[executor]] > Implement login endpoint
+# Agent [[executor]] > /help
+# Agent [[executor]] > /exit
 
 # 📝 Plan workflow (export → edit → execute)
 xkode agent "Add auth" --export-plan plan.md    # Export plan
@@ -68,28 +81,19 @@ xkode agent "Add auth" --export-plan plan.md    # Export plan
 xkode agent --plan plan.md                      # Execute edited plan
 
 # Interactive chat
-xkode chat
-xkode chat --path /my/project
+xkode ask
+xkode ask --path /my/project
 
-# Slash commands in chat
-/docs README.md     # AI đọc & tóm tắt
+# Slash commands in ask mode
+/docs README.md     # AI reads & summarizes
 /skill SKILL.md     # Load instructions
 /model qwen:32b     # Switch model
-/review             # Code review
 /help               # All commands
-
-# Single task
-xkode run "Add error handling to UserService"
-
-# Code review
-xkode review --focus security
-
-# List models
-xkode models
 ```
 
-**Multi-Agent:** Plan → Execute → Review (for complex tasks)  
-**Single-Agent:** Quick chat/run (for simple tasks)
+**Available Modes:**
+- **Agent Mode** (Interactive REPL) - Multi-agent planning and execution
+- **Ask Mode** (Interactive) - Conversational coding assistant
 
 See [MULTI-AGENT.md](MULTI-AGENT.md) for detailed documentation.
 
