@@ -182,8 +182,8 @@ public class ReviewerAgent(OllamaService ollama, ConfigService config)
         try
         {
             // Log the raw response for debugging
-            var preview = response.Length > 1000 ? response[..1000] : response;
-            Console.WriteLine($"\n[DEBUG] Raw reviewer response (first 1000 chars):\n{preview}\n");
+            var preview = response.Length > 100000 ? response[..100000] : response;
+            Console.WriteLine($"\n[DEBUG] Raw reviewer response (first 100000 chars):\n{preview}\n");
 
             return JsonExtractor.ExtractAndParse<ReviewResult>(response, "ReviewResult");
         }
@@ -192,7 +192,7 @@ public class ReviewerAgent(OllamaService ollama, ConfigService config)
             // Extract what we tried to parse
             var extracted = JsonExtractor.ExtractJson(response);
             var extractedPreview = extracted.Length > 500 ? extracted[..500] + "..." : extracted;
-
+            
             throw new AgentException(
                 $"Reviewer returned invalid JSON: {ex.Message}\n" +
                 $"Extracted JSON: {extractedPreview}");

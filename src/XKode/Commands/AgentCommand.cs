@@ -27,7 +27,7 @@ public class AgentCommand(
     public class Settings : CommandSettings
     {
         [CommandArgument(0, "[task]")]
-        [Description("Task to execute using multi-agent workflow (optional if --plan is used)")]
+        [Description("Task to execute (optional - starts interactive mode if not provided)")]
         public string? Task { get; set; }
 
         [CommandOption("--plan <FILE>")]
@@ -76,15 +76,8 @@ public class AgentCommand(
     {
         Banner.Show();
 
-        // Validate: need either task or plan file
-        if (string.IsNullOrWhiteSpace(settings.Task) && string.IsNullOrWhiteSpace(settings.PlanFile))
-        {
-            AnsiConsole.MarkupLine("[red]Error: Either <task> or --plan is required[/]");
-            AnsiConsole.MarkupLine("[grey]Usage:[/]");
-            AnsiConsole.MarkupLine("  xkode agent \"Add authentication\"");
-            AnsiConsole.MarkupLine("  xkode agent --plan plan.md");
-            return 1;
-        }
+        // Agent mode is now ALWAYS interactive
+        // No validation needed - task is optional
 
         // ── Validate Ollama connection ───────────────────────
         AnsiConsole.Markup("[cyan]Connecting to Ollama...[/] ");
@@ -137,193 +130,18 @@ public class AgentCommand(
             orchestrator.DisableReview();
         }
 
-        // ── Plan workflow: Import, Create, or Export ─────────
-        ExecutionPlan? plan = null;
-
-        // Option 1: Load plan from file
-        if (!string.IsNullOrWhiteSpace(settings.PlanFile))
-        {
-            AnsiConsole.MarkupLine($"[cyan]Loading plan from:[/] {settings.PlanFile}");
-            
-            if (!File.Exists(settings.PlanFile))
-            {
-                AnsiConsole.MarkupLine($"[red]Error: Plan file not found: {settings.PlanFile}[/]");
-                return 1;
-            }
-
-            try
-            {
-                var markdown = File.ReadAllText(settings.PlanFile);
-                plan = ExecutionPlanExtensions.FromMarkdown(markdown);
-                AnsiConsole.MarkupLine($"[green]✓ Loaded plan with {plan.Steps.Count} steps[/]");
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error parsing plan file: {Markup.Escape(ex.Message)}[/]");
-                return 1;
-            }
-        }
-        // Option 2: Create new plan
-        else
-        {
-            AnsiConsole.MarkupLine($"\n[bold cyan]🤖 Creating execution plan...[/]");
-            var newContext = BuildCodebaseContext(projectRoot, skillContent);
-            
-            try
-            {
-                plan = await planner.CreatePlanAsync(settings.Task, newContext);
-            }
-            catch (AgentException ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Planning failed: {Markup.Escape(ex.Message)}[/]");
-                return 1;
-            }
-
-            // Option 2a: Export plan and exit
-            if (settings.ExportPlan || !string.IsNullOrWhiteSpace(settings.ExportPlanFile))
-            {
-                // Determine filename
-                string filename;
-                if (!string.IsNullOrWhiteSpace(settings.ExportPlanFile))
-                {
-                    // User specified filename with --export-plan-file
-                    filename = Path.IsPathRooted(settings.ExportPlanFile)
-                        ? settings.ExportPlanFile
-                        : Path.Combine(projectRoot, settings.ExportPlanFile);
-                }
-                else
-                {
-                    // Auto-generate filename (--export-plan flag)
-                    filename = GeneratePlanFilename(settings.Task ?? plan.Goal, projectRoot);
-                }
-
-                var markdown = plan.ToMarkdown();
-                File.WriteAllText(filename, markdown);
-
-                // Show relative path for cleaner output
-                var displayPath = Path.GetRelativePath(projectRoot, filename);
-                AnsiConsole.MarkupLine($"\n[green]✓ Plan exported to:[/] [cyan]{displayPath}[/]");
-                AnsiConsole.MarkupLine($"[grey]Edit the plan, then run:[/] xkode agent --plan {displayPath}");
-                return 0;
-            }
-        }
-
-        // ── Execute the plan ──────────────────────────────────
-        AnsiConsole.MarkupLine($"\n[bold cyan]🤖 Multi-Agent Mode[/]");
+        // ── Start Interactive REPL (ALWAYS) ──────────────────
+        var replService = new AgentReplService(
+            planner, 
+            executor, 
+            reviewer, 
+            orchestrator, 
+            config,
+            skillLoaded: !string.IsNullOrWhiteSpace(skillContent),
+            noReview: settings.NoReview);
         
-        if (!string.IsNullOrWhiteSpace(settings.Task))
-        {
-            AnsiConsole.MarkupLine($"[grey]Task:[/] {Markup.Escape(settings.Task)}");
-        }
-        else if (plan != null)
-        {
-            AnsiConsole.MarkupLine($"[grey]Task:[/] {Markup.Escape(plan.Goal)}");
-        }
-        
-        AnsiConsole.MarkupLine($"[grey]Project:[/] {projectRoot}");
-
-        if (settings.AutoApprove)
-        {
-            AnsiConsole.MarkupLine("[yellow]⚠️  Auto-approve enabled - all changes will be applied automatically[/]");
-        }
-
-        var cts = new CancellationTokenSource();
-
-        // Intercept Ctrl+C
-        Console.CancelKeyPress += (s, e) =>
-        {
-            e.Cancel = true;
-            cts.Cancel();
-            AnsiConsole.MarkupLine("\n[yellow]⚠️  Cancelling...[/]");
-        };
-
-        try
-        {
-            OrchestratorResult result;
-
-            // Execute with pre-made plan or create new one
-            if (plan != null)
-            {
-                result = await orchestrator.ExecutePlanAsync(
-                    plan,
-                    projectRoot,
-                    settings.AutoApprove,
-                    cts.Token);
-            }
-            else
-            {
-                result = await orchestrator.ExecuteTaskAsync(
-                    settings.Task ?? "",
-                    projectRoot,
-                    settings.AutoApprove,
-                    cts.Token);
-            }
-
-            // ── Display final result ─────────────────────────
-            AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule("[bold cyan]Result[/]").RuleStyle("cyan"));
-            AnsiConsole.WriteLine();
-
-            if (result.Cancelled)
-            {
-                AnsiConsole.MarkupLine("[yellow]⚠️  Cancelled by user[/]");
-                return 2;
-            }
-
-            if (result.Success)
-            {
-                AnsiConsole.MarkupLine("[bold green]✓ Task completed successfully![/]");
-
-                if (result.Plan != null)
-                {
-                    AnsiConsole.MarkupLine(
-                        $"[grey]Completed {result.Plan.CompletedSteps}/{result.Plan.TotalSteps} steps[/]");
-                }
-
-                if (result.FinalReview != null)
-                {
-                    AnsiConsole.MarkupLine(
-                        $"[grey]Final score: {result.FinalReview.Score}/10[/]");
-                }
-
-                return 0;
-            }
-            else
-            {
-                AnsiConsole.MarkupLine("[bold red]✗ Task failed[/]");
-
-                if (!string.IsNullOrWhiteSpace(result.Error))
-                {
-                    AnsiConsole.MarkupLine($"[red]{Markup.Escape(result.Error)}[/]");
-                }
-
-                return 1;
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            AnsiConsole.MarkupLine("\n[yellow]⚠️  Operation cancelled[/]");
-            return 2;
-        }
-        catch (AgentException ex)
-        {
-            AnsiConsole.MarkupLine($"\n[bold red]Agent Error:[/] {Markup.Escape(ex.Message)}");
-            return 1;
-        }
-        catch (Exception ex)
-        {
-            AnsiConsole.MarkupLine($"\n[bold red]Error:[/] {Markup.Escape(ex.Message)}");
-            AnsiConsole.WriteException(ex);
-            return 1;
-        }
-        finally
-        {
-            // Restore config
-            if (settings.NoReview)
-            {
-                config.AutoLoadSkill = true;
-            }
-        }
+        // Pass initial task if provided
+        return await replService.RunAsync(projectRoot, settings.AutoApprove, settings.Task);
     }
 
     // ── Auto-load SKILL.md ───────────────────────────────────

@@ -118,7 +118,7 @@ public class PlannerAgent(OllamaService ollama, ConfigService config)
             var plan = JsonExtractor.ExtractAndParse<ExecutionPlan>(response, "ExecutionPlan");
 
             // Validate
-            if (plan.Steps.Count == 0)
+             if (plan.Steps.Count == 0)
                 throw new AgentException("Plan must have at least one step");
 
             if (plan.Steps.Count > 100)

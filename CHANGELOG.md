@@ -1,5 +1,85 @@
 # XKode Changelog
 
+## [v0.3.0] - Interactive Agent Mode - 2026-02-24
+
+### 🚀 Major Features
+
+#### ✨ Interactive Agent REPL
+Agent mode is now ALWAYS interactive - no more complex flags!
+
+**Usage:**
+```bash
+# Start interactive mode
+xkode agent
+
+# Start with initial task
+xkode agent "Add authentication"
+```
+
+**Interactive Commands:**
+- `/switch <agent>` - Switch between planner/executor/reviewer
+- `/agents` - List available agents
+- `/plan` - Show current execution plan
+- `/export <file>` - Export plan to markdown
+- `/status` - Show session status
+- `/config` - Show configuration
+- `/history` - Show conversation history
+- `/help` - Show all commands
+- `/exit` - Exit agent mode
+
+**Benefits:**
+- 🎯 Simpler UX - no flags to remember
+- 🔄 Continue working without retyping commands
+- 🔀 Switch agents mid-session
+- 📊 Track session history and status
+- 💾 Export plans anytime
+
+#### 📄 Auto-Save Documentation (NEW!)
+All plans and reviews automatically saved for project documentation!
+
+**Auto-saved to:**
+- `docs/plans/` - Every execution plan
+- `docs/reviews/` - Every code review
+
+**What gets saved:**
+- Complete execution plans with all steps
+- Code reviews with issues and suggestions
+- Timestamped filenames for tracking
+- Markdown format for easy viewing
+
+**Benefits:**
+- 📚 Automatic project documentation
+- 🤝 Team collaboration and transparency
+- 🔍 Audit trail of AI decisions
+- 📈 Track improvements over time
+
+**See:** [DOCS-AUTO-SAVE.md](DOCS-AUTO-SAVE.md) for full details
+
+### 🔧 Improvements
+
+- Renamed `xkode chat` to `xkode ask` for clarity
+- Removed `--interactive` flag (always interactive now)
+- Task argument is optional (starts empty REPL)
+- Session tracks history, duration, completed steps
+- Cleaner exit with session summary
+- All flags (--yes, --no-review) shown in welcome screen
+- Status display shows all configuration
+- Fixed markup color error in prompts
+
+### 🗑️ Removed (Deprecated)
+
+- **`xkode run`** - Use `xkode agent` instead (interactive REPL)
+- **`xkode review`** - Code review now built into agent workflow
+- **`xkode models`** - Use `xkode config get model` or check Ollama directly
+
+**Command Renamed:**
+- `xkode chat` → `xkode ask` (more intuitive for Q&A interaction)
+
+**Rationale:** These commands were redundant with the new multi-agent system.
+Agent mode now handles all use cases in an interactive, more powerful way.
+
+---
+
 ## [v0.2.0] - Multi-Agent System - 2026-02-20
 
 ### 🚀 Major Features

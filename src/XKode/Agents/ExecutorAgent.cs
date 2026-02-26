@@ -149,11 +149,11 @@ public class ExecutorAgent(
         var lines = response.Split('\n');
         var cleanedLines = new List<string>();
         bool inThinkingBlock = false;
-
+        
         foreach (var line in lines)
         {
             var trimmed = line.Trim();
-
+            
             // Detect start of thinking blocks
             if (trimmed.StartsWith("Thinking", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.StartsWith("...thinking", StringComparison.OrdinalIgnoreCase) ||
@@ -162,7 +162,7 @@ public class ExecutorAgent(
                 inThinkingBlock = true;
                 continue;
             }
-
+            
             // Detect end of thinking blocks
             if (trimmed.StartsWith("...done thinking", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.StartsWith("Done thinking", StringComparison.OrdinalIgnoreCase) ||
@@ -171,14 +171,14 @@ public class ExecutorAgent(
                 inThinkingBlock = false;
                 continue;
             }
-
+            
             // Skip lines that are part of thinking blocks
             if (!inThinkingBlock)
             {
                 cleanedLines.Add(line);
             }
         }
-
+        
         return string.Join('\n', cleanedLines).Trim();
     }
 }
